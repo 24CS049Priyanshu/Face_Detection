@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Face Detection Project</title>
+
+    <!-- MathJax for proper formula rendering -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [
+                    ['$', '$'],
+                    ['\\(', '\\)']
+                ],
+                displayMath: [
+                    ['$$', '$$'],
+                    ['\\[', '\\]']
+                ]
+            }
+        };
+    </script>
+
+    <!-- TensorFlow.js and face detection libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            padding: 30px;
+            text-align: center;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .status {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .video-section {
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .video-container {
+            position: relative;
+            display: inline-block;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+        
+        #video {
+            display: block;
+            width: 640px;
+            height: 480px;
+            max-width: 100%;
+        }
+        
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            min-width: 150px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+            color: white;
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .math-section {
+            padding: 40px;
+            background: #f8f9fa;
+        }
+        
+        .math-section h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+        
+        .math-item {
+            background: white;
+            margin: 25px 0;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #667eea;
+        }
+        
+        .math-item h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .math-item p {
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .formula-box {
+            background: #f1f3f4;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+            border: 2px solid #e1e5e9;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            #video {
+                width: 100%;
+                height: auto;
+            }
+            .stats {
+                flex-direction: column;
+                align-items: center;
+            }
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔬 AI Face Detection Laboratory</h1>
+            <p>Real-time Computer Vision with Mathematical Analysis</p>
+        </div>
+
+        <div id="status" class="status">
+            Initializing camera and AI models... Please wait.
+        </div>
+
+        <div class="video-section">
+            <div class="video-container">
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="canvas" width="640" height="480"></canvas>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div id="faceCount" class="stat-number">0</div>
+                    <div class="stat-label">Faces Detected</div>
+                </div>
+                <div class="stat-card">
+                    <div id="confidence" class="stat-number">0%</div>
+                    <div class="stat-label">Avg Confidence</div>
+                </div>
+                <div class="stat-card">
+                    <div id="fps" class="stat-number">0</div>
+                    <div class="stat-label">FPS</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="startBtn" class="btn btn-primary">Start Detection</button>
+                <button id="captureBtn" class="btn btn-success hidden">📸 Capture</button>
+                <button id="downloadBtn" class="btn btn-warning hidden">💾 Download</button>
+            </div>
+        </div>
+
+        <div class="math-section">
+            <h2>🧮 Mathematical Foundation of Face Detection</h2>
+
+            <div class="math-item">
+                <h3>Q1: How is an image represented mathematically?</h3>
+                <p><strong>Answer:</strong> Digital images are represented as multi-dimensional matrices. For grayscale images, we have a 2D matrix where each element represents pixel intensity (0-255). For RGB color images, we stack three such matrices.</p>
+                <div class="formula-box">
+                    $$I_{gray}(x,y) = \begin{bmatrix} p_{1,1} & p_{1,2} & \cdots & p_{1,n} \\ p_{2,1} & p_{2,2} & \cdots & p_{2,n} \\ \vdots & \vdots & \ddots & \vdots \\ p_{m,1} & p_{m,2} & \cdots & p_{m,n} \end{bmatrix}$$ $$I_{RGB} = [I_R, I_G, I_B] \text{ where each channel
+                    is a 2D matrix}$$
+                </div>
+            </div>
+
+            <div class="math-item">
+                <h3>Q2: What is Convolution and why is it crucial for feature detection?</h3>
+                <p><strong>Answer:</strong> Convolution is a mathematical operation that slides a filter (kernel) across the image to detect specific features like edges, corners, or textures. This is the core operation in Convolutional Neural Networks (CNNs).</p>
+                <div class="formula-box">
+                    $$(I * K)(x,y) = \sum_{m=-a}^{a} \sum_{n=-b}^{b} I(x+m, y+n) \cdot K(m,n)$$
+
+                    <p>Where $K$ is the convolution kernel and $I$ is the input image.</p>
+
+                    $$\text{Edge Detection Kernel: } K_{edge} = \begin{bmatrix} -1 & -1 & -1 \\ -1 & 8 & -1 \\ -1 & -1 & -1 \end{bmatrix}$$
+                </div>
+            </div>
+
+            <div class="math-item">
+                <h3>Q3: How does the neural network make predictions?</h3>
+                <p><strong>Answer:</strong> The network uses the sigmoid activation function to convert raw scores into probabilities. Multiple layers transform the input through weighted combinations and non-linear activations.</p>
+                <div class="formula-box">
+                    $$\sigma(z) = \frac{1}{1 + e^{-z}} \text{ where } z = \sum_{i=1}^{n} w_i x_i + b$$ $$P(\text{face}|x) = \sigma(W \cdot \phi(x) + b)$$
+
+                    <p>Where $\phi(x)$ represents the learned feature representation of input $x$.</p>
+                </div>
+            </div>
+
+            <div class="math-item">
+                <h3>Q4: How are bounding boxes calculated?</h3>
+                <p><strong>Answer:</strong> Face detection models predict bounding box coordinates and dimensions. The output includes center coordinates, width, height, and confidence score.</p>
+                <div class="formula-box">
+                    $$\text{Bounding Box: } B = (x_{center}, y_{center}, width, height, confidence)$$ $$\text{Corner Coordinates: } \begin{cases} x_{min} = x_{center} - \frac{width}{2} \\ y_{min} = y_{center} - \frac{height}{2} \\ x_{max} = x_{center} + \frac{width}{2} \\
+                    y_{max} = y_{center} + \frac{height}{2} \end{cases}$$
+                </div>
+            </div>
+
+            <div class="math-item">
+                <h3>Q5: What is Non-Maximum Suppression (NMS)?</h3>
+                <p><strong>Answer:</strong> NMS eliminates duplicate detections by calculating Intersection over Union (IoU) between overlapping boxes and keeping only the highest confidence detection.</p>
+                <div class="formula-box">
+                    $$IoU = \frac{\text{Area of Intersection}}{\text{Area of Union}} = \frac{|B_1 \cap B_2|}{|B_1 \cup B_2|}$$ $$\text{Keep box if: } IoU
+                    < \text{threshold} \text{ or } \text{confidence}> \text{max confidence}$$
+                </div>
+            </div>
+
+            <div class="math-item">
+                <h3>Q6: How is detection confidence calculated?</h3>
+                <p><strong>Answer:</strong> Confidence combines objectness score (probability that box contains an object) with classification probability.</p>
+                <div class="formula-box">
+                    $$\text{Confidence} = P(\text{Object}) \times P(\text{Class}|\text{Object}) \times IoU_{pred}^{truth}$$ $$\text{Final Score} = \sigma(\text{raw output}) \times 100\%$$
+                </div>
+            </div>
+
+            <div class="math-item">
+                <h3>Q7: How does real-time processing work?</h3>
+                <p><strong>Answer:</strong> Frame rate (FPS) is calculated by measuring processing time per frame. Optimization techniques like model quantization and efficient architectures enable real-time performance.</p>
+                <div class="formula-box">
+                    $$FPS = \frac{1}{\text{Processing Time per Frame}}$$ $$\text{Processing Time} = T_{preprocessing} + T_{inference} + T_{postprocessing}$$
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let model = null;
+        let video = null;
+        let canvas = null;
+        let ctx = null;
+        let isDetecting = false;
+        let stream = null;
+        let lastFrameTime = 0;
+        let frameCount = 0;
+        let fpsCounter = 0;
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', async() => {
+            await initializeApp();
+        });
+
+        async function initializeApp() {
+            try {
+                // Get DOM elements
+                video = document.getElementById('video');
+                canvas = document.getElementById('canvas');
+                ctx = canvas.getContext('2d');
+
+                const startBtn = document.getElementById('startBtn');
+                const captureBtn = document.getElementById('captureBtn');
+                const downloadBtn = document.getElementById('downloadBtn');
+
+                // Event listeners
+                startBtn.addEventListener('click', startDetection);
+                captureBtn.addEventListener('click', captureFrame);
+                downloadBtn.addEventListener('click', downloadImage);
+
+                updateStatus('Loading AI models... This may take a moment.', 'info');
+
+                // Load the face detection model
+                model = await blazeface.load();
+                updateStatus('AI models loaded successfully! Click "Start Detection" to begin.', 'success');
+
+                startBtn.disabled = false;
+
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                updateStatus('Failed to initialize. Please refresh the page and try again.', 'error');
+            }
+        }
+
+        async function startDetection() {
+            try {
+                updateStatus('Requesting camera access...', 'info');
+
+                // Request camera permission explicitly
+                const constraints = {
+                    video: {
+                        width: {
+                            ideal: 640,
+                            min: 480
+                        },
+                        height: {
+                            ideal: 480,
+                            min: 360
+                        },
+                        facingMode: 'user'
+                    },
+                    audio: false
+                };
+
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+
+                // Wait for video to load
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve();
+                    };
+                });
+
+                updateStatus('Camera active. Face detection running...', 'success');
+
+                // Update UI
+                document.getElementById('startBtn').classList.add('hidden');
+                document.getElementById('captureBtn').classList.remove('hidden');
+                document.getElementById('downloadBtn').classList.remove('hidden');
+
+                // Start detection loop
+                isDetecting = true;
+                detectFaces();
+
+            } catch (error) {
+                console.error('Camera access failed:', error);
+                updateStatus('Camera access denied. Please allow camera permissions and try again.', 'error');
+            }
+        }
+
+        async function detectFaces() {
+            if (!isDetecting || !model) return;
+
+            try {
+                const currentTime = performance.now();
+
+                // Get predictions from the model
+                const predictions = await model.estimateFaces(video, false);
+
+                // Clear canvas and redraw video frame
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Draw face detections
+                let totalConfidence = 0;
+                predictions.forEach((prediction, index) => {
+                    const [x, y] = prediction.topLeft;
+                    const [x2, y2] = prediction.bottomRight;
+                    const width = x2 - x;
+                    const height = y2 - y;
+                    const confidence = Math.round(prediction.probability * 100);
+
+                    totalConfidence += confidence;
+
+                    // Draw bounding box
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x, y, width, height);
+
+                    // Draw confidence label
+                    ctx.fillStyle = '#00ff00';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText(`Face ${index + 1}: ${confidence}%`, x, y - 10);
+
+                    // Draw center point
+                    ctx.fillStyle = '#ff0000';
+                    ctx.beginPath();
+                    ctx.arc(x + width / 2, y + height / 2, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+
+                // Update statistics
+                document.getElementById('faceCount').textContent = predictions.length;
+                document.getElementById('confidence').textContent =
+                    predictions.length > 0 ? Math.round(totalConfidence / predictions.length) + '%' : '0%';
+
+                // Calculate FPS
+                frameCount++;
+                if (currentTime - lastFrameTime >= 1000) {
+                    document.getElementById('fps').textContent = frameCount;
+                    frameCount = 0;
+                    lastFrameTime = currentTime;
+                }
+
+                // Continue detection loop
+                requestAnimationFrame(detectFaces);
+
+            } catch (error) {
+                console.error('Detection error:', error);
+                updateStatus('Detection error occurred. Continuing...', 'warning');
+                requestAnimationFrame(detectFaces);
+            }
+        }
+
+        function captureFrame() {
+            const link = document.createElement('a');
+            link.download = `face_detection_${new Date().getTime()}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        function downloadImage() {
+            captureFrame();
+        }
+
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = 'status';
+
+            switch (type) {
+                case 'success':
+                    statusEl.style.background = '#d4edda';
+                    statusEl.style.color = '#155724';
+                    statusEl.style.borderColor = '#c3e6cb';
+                    break;
+                case 'error':
+                    statusEl.style.background = '#f8d7da';
+                    statusEl.style.color = '#721c24';
+                    statusEl.style.borderColor = '#f5c6cb';
+                    break;
+                case 'warning':
+                    statusEl.style.background = '#fff3cd';
+                    statusEl.style.color = '#856404';
+                    statusEl.style.borderColor = '#ffeaa7';
+                    break;
+                default:
+                    statusEl.style.background = '#d1ecf1';
+                    statusEl.style.color = '#0c5460';
+                    statusEl.style.borderColor = '#bee5eb';
+            }
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+
+</html>
